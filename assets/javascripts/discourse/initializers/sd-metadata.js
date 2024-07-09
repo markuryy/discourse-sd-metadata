@@ -23,7 +23,7 @@ export default {
               
               try {
                 const [parameters, isParameters] = await extract(img.src);
-                if (isParameters) {
+                if (isParameters && parameters) {
                   const metadata = parse(parameters);
                   const metadataText = JSON.stringify(metadata, null, 2);
                   
@@ -34,7 +34,8 @@ export default {
                       top: '50%',
                       left: '50%',
                       transform: 'translate(-50%, -50%)',
-                      backgroundColor: 'white',
+                      backgroundColor: '#f8f8f8',
+                      color: '#333',
                       padding: '20px',
                       borderRadius: '5px',
                       boxShadow: '0 0 10px rgba(0,0,0,0.5)',
@@ -47,13 +48,18 @@ export default {
 
                   const $closeButton = $('<button>', {
                     text: 'Close',
+                    class: 'btn btn-primary',
                     css: {
                       marginTop: '10px'
                     },
                     click: () => $modal.remove()
                   });
 
-                  $modal.append($('<pre>').text(metadataText), $closeButton);
+                  $modal.append($('<pre>').text(metadataText).css({
+                    whiteSpace: 'pre-wrap',
+                    wordWrap: 'break-word',
+                    color: '#333'
+                  }), $closeButton);
                   $('body').append($modal);
                 } else {
                   alert('No Stable Diffusion metadata found in this image.');

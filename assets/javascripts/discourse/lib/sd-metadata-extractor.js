@@ -1,17 +1,4 @@
-function getStringWithUTF8(numbers) {
-    return String.fromCharCode.apply(null, numbers);
-  }
-  
-  function getStringWithUTF16(numbers) {
-    let str = '';
-    for (let i = 0; i < numbers.length; i += 2) {
-      const unicode = (numbers[i] << 8) | numbers[i + 1];
-      str += String.fromCharCode(unicode);
-    }
-    return str;
-  }
-  
-  async function extract(file) {
+async function extract(file) {
     const response = await fetch(file);
     const arrayBuffer = await response.arrayBuffer();
     const view = new DataView(arrayBuffer);
@@ -77,6 +64,19 @@ function getStringWithUTF8(numbers) {
     }
   
     return metadata;
+  }
+  
+  function getStringWithUTF8(numbers) {
+    return String.fromCharCode.apply(null, numbers);
+  }
+  
+  function getStringWithUTF16(numbers) {
+    let str = '';
+    for (let i = 0; i < numbers.length; i += 2) {
+      const unicode = (numbers[i] << 8) | numbers[i + 1];
+      str += String.fromCharCode(unicode);
+    }
+    return str;
   }
   
   export { extract, parse };
