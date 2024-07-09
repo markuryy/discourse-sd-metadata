@@ -1,71 +1,66 @@
-# frozen_string_literal: true
+require 'json'
+require 'mini_magick'
+require 'exifr/jpeg'
 
 module MyPluginModule
-    module MetadataParser
-      require 'mini_magick'
-      require 'json'
-      require 'nokogiri'
-  
-      def self.extract_metadata(upload)
-        metadata = {}
-        image_path = upload.url
-  
-        begin
-          image = MiniMagick::Image.open(image_path)
-  
-          if image.type == 'PNG'
-            metadata = extract_png_metadata(image)
-          elsif image.type == 'JPEG'
-            metadata = extract_jpeg_metadata(image)
-          end
-        rescue => e
-          Rails.logger.error("Failed to extract metadata: #{e.message}")
-        end
-  
-        metadata
+  class MetadataParser
+    def self.extract_metadata(upload)
+      file_path = Rails.root.join("public", upload.url[1..-1])
+
+      unless File.exist?(file_path)
+        return { error: "File not found: #{file_path}" }
       end
-  
-      def self.extract_png_metadata(image)
-        metadata = {}
-        image.data.each do |key, value|
-          metadata[key] = value.is_a?(String) ? value : value.to_s
-        end
-  
-        if metadata['parameters']
-          metadata['tool'] = 'Stable Diffusion'
-          metadata['params'] = parse_parameters(metadata['parameters'])
-        end
-  
-        metadata
+
+      extension = File.extname(file_path).downcase
+      metadata = {}
+
+      case extension
+      when ".png"
+        metadata = extract_png_metadata(file_path)
+      when ".jpg", ".jpeg", ".webp"
+        metadata = extract_jpeg_metadata(file_path)
+      else
+        metadata = { error: "Unsupported image format: #{extension}" }
       end
-  
-      def self.extract_jpeg_metadata(image)
-        metadata = {}
-        exif = image.exif
-        comment = exif['Exif']['UserComment']
-  
-        if comment
-          raw_data = comment.is_a?(String) ? comment : comment.pack('C*')
-          begin
-            data_json = JSON.parse(raw_data)
-            metadata.merge!(data_json)
-            metadata['tool'] = 'Stable Diffusion'
-          rescue JSON::ParserError
-            Rails.logger.warn("Failed to parse JSON metadata from JPEG comment")
-          end
-        end
-  
-        metadata
-      end
-  
-      def self.parse_parameters(parameters)
-        begin
-          params = JSON.parse(parameters)
-          return params
-        rescue JSON::ParserError
-          return parameters
-        end
+
+      metadata
+    end
+
+    def self.extract_png_metadata(file_path)
+      image = MiniMagick::Image.open(file_path)
+      if image["parameters"]
+        parse_json(image["parameters"])
+      elsif image["Software"]&.include?("A1111")
+        { tool: "A1111", data: image["Software"] }
+      elsif image["Comment"]
+        parse_comfyui_metadata(image["Comment"])
+      else
+        {}
       end
     end
+
+    def self.extract_jpeg_metadata(file_path)
+      exif_data = EXIFR::JPEG.new(file_path)
+      user_comment = exif_data&.user_comment
+
+      if user_comment
+        comment = user_comment[8..-1].force_encoding('UTF-16').encode('UTF-8')
+        parse_json(comment)
+      elsif exif_data&.software&.include?("A1111")
+        { tool: "A1111", data: exif_data.software }
+      else
+        {}
+      end
+    end
+
+    def self.parse_comfyui_metadata(comment)
+      parse_json(comment)
+    end
+
+    def self.parse_json(data)
+      JSON.parse(data)
+    rescue JSON::ParserError
+      { error: "Failed to parse JSON" }
+    end
   end
-  
+end
